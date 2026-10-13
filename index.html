@@ -106,6 +106,9 @@ body{overflow-x:clip;overscroll-behavior-x:none}
 .card-sheet:has(#cardReading:not([hidden])){max-height:96dvh;padding-top:14px}
 .card-sheet:has(#cardReading:not([hidden])) .sheet-header{margin-bottom:10px}
 @media(max-height:640px){.card-sheet:has(#cardReading:not([hidden])) .card-art-stage{width:min(100%,calc(43dvh * .713))}.reading-coach{padding:9px}.reading-coach p{font-size:11px;margin:7px 0}.card-sheet:has(#cardReading:not([hidden])){padding-bottom:max(10px,env(safe-area-inset-bottom,0px))}}
+
+/* Tutorial actions preserve the user viewport instead of anchoring to replaced cards. */
+.is-learning .tutorial-shell{overflow-anchor:none}
 </style>
 </head>
 <body data-standalone="true">
@@ -357,6 +360,7 @@ document.querySelectorAll('[data-embedded]').forEach(img=>{img.src=embeddedArt[i
   function start(index, resume = false) {
     closeModal("lessonDialog");
     if (!resume) run = T.create(index);
+    document.querySelector(".coach-dialog").style.minHeight = "";
     showTargets = false; started = true; save(); render(); top();
   }
   function directory() {
@@ -581,6 +585,16 @@ document.querySelectorAll('[data-embedded]').forEach(img=>{img.src=embeddedArt[i
     if (lesson.id === "challenge" && run.cursor >= 6 && !run.ok && !showTargets) $("actionTip").textContent = "自己试一试，或点上方「提示」";
     highlight();
   }
+  function renderInPlace() {
+    const position = window.scrollY;
+    const coach = document.querySelector(".coach-dialog");
+    // Keep the page tall enough when feedback is shorter than the previous text.
+    // Otherwise the browser clamps scrollY at the bottom before we can restore it.
+    coach.style.minHeight = `${Math.ceil(coach.getBoundingClientRect().height)}px`;
+    render();
+    if (!$("classroom").hidden) window.scrollTo({ left: 0, top: position, behavior: "auto" });
+    else top();
+  }
   document.addEventListener("click", event => {
     const node = event.target.closest("[data-action]");
     if (!node || !started || run.ok || !T.current(run) || !$("cardDialog").hidden || !$("lessonDialog").hidden) return;
@@ -591,8 +605,7 @@ document.querySelectorAll('[data-embedded]').forEach(img=>{img.src=embeddedArt[i
     T.act(run, node.dataset.action);
     // Final action counts immediately, including if the user refreshes before Continue.
     if (run.ok && run.cursor === T.lessons[run.lesson].steps.length - 1 && !completed.includes(T.lessons[run.lesson].id)) completed.push(T.lessons[run.lesson].id);
-    save(); render();
-    revealVertically($("feedback"));
+    save(); renderInPlace();
   });
   $("startLearning").onclick = () => start(run.lesson, true);
   if (run.history.length || completed.length) $("startLearning").textContent = "继续教学 →";
@@ -602,11 +615,11 @@ document.querySelectorAll('[data-embedded]').forEach(img=>{img.src=embeddedArt[i
   $("readingNext").onclick = () => {
     if (readingIndex < cardReading.length - 1) { readingIndex++; renderCardReading(); return; }
     closeModal("cardDialog");
-    if (T.act(run, "inspect:yueying")) { save(); render(); revealVertically($("feedback")); }
+    if (T.act(run, "inspect:yueying")) { save(); renderInPlace(); }
   };
   $("restartLesson").onclick = () => start(run.lesson);
   $("reviewLesson").onclick = () => start(run.lesson);
-  $("nextStep").onclick = () => { if (T.next(run)) { showTargets = false; save(); render(); top(); } };
+  $("nextStep").onclick = () => { if (T.next(run)) { showTargets = false; save(); renderInPlace(); } };
   $("showHint").onclick = () => {
     if (!T.current(run) || run.ok) return;
     showTargets = true; run.feedback = T.current(run).hint; render();
