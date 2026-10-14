@@ -164,7 +164,7 @@ document.querySelectorAll('[data-embedded]').forEach(img=>{img.src=embeddedArt[i
  * No random opponent, network writes, or access to another player's hand. */
 (function (root) {
   "use strict";
-  const phases = ["准备", "判定", "摸牌", "出牌", "上阵", "弃牌", "结束"];
+  const phases = ["准备", "判定", "摸牌", "出牌", "弃牌", "结束"];
   const card = (id, name, extra = {}) => ({ id, name, ...extra });
   const general = (id, name, art, extra = {}) => ({ id, name, art, ...extra });
   const yueying = (extra = {}) => general("yueying", "黄月英", "TY01-099", { materials: [], ...extra });
@@ -191,35 +191,40 @@ document.querySelectorAll('[data-embedded]').forEach(img=>{img.src=embeddedArt[i
       step("休整不是弃手牌", "休整会把战场上的武将移入休整区。游戏牌使用或弃置后则通常进入公共弃牌堆。", "点击「休整区」，区分这两个去向。", ["zone:rest"], () => {}, "很好。武将与游戏牌走的是不同的区域路线。", "点击我方牌桌右下方的休整区。")
     ] },
     { id: "opening", title: "决定起手", subtitle: "先看手牌，再做调度", time: "1 分钟", icon: "起手", setup: () => ({ ...base(), phase: "手牌调度", hand: [card("a", "杀"), card("b", "杀"), card("c", "酒"), card("d", "酒")] }), recap: "双方依次选择保留或调度。调度会将原手牌随机置于牌库底，再抽取 4 张，不是只换选中的一张。", steps: [
-      step("试一次整手调度", "这手牌偏进攻，缺少【闪】。本次练习选择调度：将全部 4 张手牌随机置于牌库底，再抽 4 张。练习的新手牌已固定。", "点击「调度手牌」。", ["action:mulligan"], s => { s.hand = [card("sha", "杀"), card("shan", "闪"), card("tao", "桃"), card("jiu", "酒")]; }, "4 张起手牌全部换过了；牌堆数量不变，也没有牌被弃置。", "在右侧操作区选择调度，不是点击单张手牌。"),
+      step("试一次整手调度", "这手牌偏进攻，缺少【闪】。本次练习选择调度：将全部 4 张手牌随机置于牌库底，再抽 4 张。", "点击「调度手牌」。", ["action:mulligan"], s => { s.hand = [card("sha", "杀"), card("shan", "闪"), card("tao", "桃"), card("jiu", "酒")]; }, "4 张起手牌全部换过了；牌堆数量不变，也没有牌被弃置。", "在右侧操作区选择调度，不是点击单张手牌。"),
       step("认出防御牌", "新的手牌中有进攻、防御和回复。现在只是认识牌，尚未进入出牌阶段。", "点击手牌中的【闪】。", ["hand:shan"], () => {}, "【闪】一般在要求你响应时使用，不能当成自己的主动进攻牌。", "找到牌名为「闪」的手牌。")
     ] },
     { id: "attack", title: "打出第一张杀", subtitle: "选牌 → 选目标 → 看结算", time: "2 分钟", icon: "进攻", setup: () => ({ ...base(), enemyHand: 0 }), recap: "【杀】先指定目标，再等待响应，未被闪避时造成伤害。默认每个出牌阶段只能主动使用 1 张杀，卡牌或技能可以改变限制。", steps: [
       step("选择你的进攻牌", "当前是你的出牌阶段。对手这次没有手牌，也没有防具或伤害技能。先选【杀】，再指定目标。", "点击手牌中的【杀】。", ["hand:sha"], s => { s.selected = "sha"; }, "已选中【杀】。选牌还没有消耗它，接下来指定对手。", "点击我方手牌第一张【杀】。"),
-      step("杀的目标是玩家", "本次练习直接对对手使用【杀】。不要把武将的数量误当作玩家体力。", "点击上方的「对手 · 体力」。", ["target:enemy"], s => { s.processing = use(s, "sha").name; s.selected = ""; s.attacked = true; }, "【杀】进入处理区，等待对手响应；此时还没有扣除体力。", "目标是对手玩家，点击对手的体力条。"),
+      step("杀的目标是玩家", "本次练习直接对对手使用【杀】。", "点击上方的「对手 · 体力」。", ["target:enemy"], s => { s.processing = use(s, "sha").name; s.selected = ""; s.attacked = true; }, "【杀】进入处理区，等待对手响应；此时还没有扣除体力。", "目标是对手玩家，点击对手的体力条。"),
       step("看清响应后的结果", "对手没有【闪】，本次也没有其他响应。继续结算，基础伤害为 1 点。", "点击「结算伤害」。", ["action:damage"], s => { s.enemyHp--; s.discard.push(card("used-sha", "杀")); s.processing = ""; }, "对手体力 5 → 4；【杀】完成结算后进入弃牌堆，本阶段主动杀次数已用。", "处理区显示着【杀】，点击右侧结算按钮。")
     ] },
     { id: "respond", title: "用闪守住体力", subtitle: "对手回合，也有你的决定", time: "1 分钟", icon: "应对", setup: () => ({ ...base(), phase: "对手出牌 · 等待闪", processing: "对手的杀", enemyHand: 1 }), recap: "响应窗口出现时再使用【闪】。闪避杀不扣体力；【桃】回复体力，不能代替【闪】。", steps: [
       step("轮到你响应", "对手使用了一张普通【杀】，正在等待你响应。你可以用【闪】避免这次伤害。", "点击手牌中的【闪】。", ["hand:shan"], s => { s.discard.push(use(s, "shan"), card("enemy-sha", "杀")); s.processing = ""; }, "你使用了【闪】。这次杀被闪避，你仍为 4 / 5 体力。", "【桃】不能闪避【杀】；请选择【闪】。"),
       step("核对结算", "响应结束后，两张游戏牌都进入弃牌堆。你可以随时查看牌堆的变化来理解发生了什么。", "点击公共「弃牌堆」。", ["zone:discard"], () => {}, "弃牌堆中是你使用的【闪】和对手的【杀】。", "公共牌堆位于双方牌桌之间。")
     ] },
-    { id: "skill", title: "看懂武将与发动技能", subtitle: "读牌面，再练横置与休整", time: "4 分钟", icon: "武将", setup: () => ({ ...base(), field: [yueying(), zhangfei("ally")], hand: [], tricksUsed: 1, discard: [card("previous-trick", "无中生有")] }), recap: "妙想神机·黄月英发动技能需要横置并休整 1。横置的黄月英仍在战场，支付费用的张飞进入休整区。下个自己的回合，黄月英可在准备阶段重置。", steps: [
-      step("先放大，认识武将牌", "先看懂牌面，再发动技能。点击黄月英，放大查看身份信息、发动时机、费用、技能效果和界限突破。", "点击黄月英，打开卡面讲解。", ["inspect:yueying"], () => {}, "卡面读完了。回到战场，按刚才看到的时机与费用发动技能。", "点亮框中的黄月英即可放大；看完四段讲解，再开始操作。"),
+    { id: "skill", title: "看懂武将与发动技能", subtitle: "读牌面，再练横置与休整", time: "5 分钟", icon: "武将", setup: () => ({ ...base(), field: [yueying(), zhangfei("ally")], hand: [], tricksUsed: 1, discard: [card("previous-trick", "无中生有")] }), recap: "妙想神机·黄月英发动技能需要横置并休整 1。休整张飞时，黄月英横置留场，技能摸1；改为休整自身时，先额外摸1，再结算技能摸1。只有留在战场的横置武将，才会在下个自己的回合准备阶段重置。", steps: [
+      step("先放大，认识武将牌", "先看懂牌面，再发动技能。点击黄月英，放大查看武将信息、发动时机、费用、技能效果和界限突破。", "点击黄月英，打开卡面讲解。", ["inspect:yueying"], () => {}, "卡面读完了。回到战场，按刚才看到的时机与费用发动技能。", "点亮框中的黄月英即可放大；看完四段讲解，再开始操作。"),
       step("找一名需要横置的武将", "妙想神机·黄月英：出牌阶段 横置，休整1：摸X牌，X为本回合使用锦囊的次数，至多为2。本局面已使用1张锦囊，所以本次摸1。", "点击黄月英，声明发动技能。", ["field:yueying"], s => { s.selected = "yueying"; }, "已声明黄月英技能，接下来一起支付横置与休整1的费用。", "点战场上的黄月英。她的牌文确实写有「横置」，发动前要看清费用。"),
       step("横置发动者，休整另一名武将", "选择张飞支付休整1；黄月英横置后留在战场。两项费用都要支付，横置并不能代替休整。", "点击张飞，支付本次技能费用。", ["field:ally"], s => { s.field.find(c => c.id === "yueying").tapped = true; rest(s, "ally"); s.selected = ""; }, "黄月英已横置；张飞进入休整区。本次没有休整发动者自身，不额外摸牌。", "点张飞支付休整；黄月英将横置并留在战场。"),
       step("费用支付后，摸牌", "本回合已使用1张锦囊，X=1。现在结算黄月英的摸牌效果。练习牌堆顶固定为闪。", "点击公共游戏牌堆，摸1张。", ["zone:deck"], s => { draw(s, card("shan", "闪")); }, "获得1张闪。黄月英仍横置，此时无法再次支付横置费用。", "点双方牌垫之间的游戏牌堆。"),
-      step("横置状态会留下来", "看看横着的黄月英和休整区里的张飞。下一章从下个自己的回合开始，亲手把黄月英重置；休整区的张飞不会因此自动回场。", "点击「进入下个自己的回合」。", ["action:next-own-turn"], s => { s.phase = "准备"; s.tricksUsed = 0; }, "进入下个自己的回合。黄月英等待准备阶段重置，张飞仍在休整区。", "黄月英尚未重置，不能重复发动。点击对话框按钮进入下一课的回合。")
+      step("换一种费用选择", "刚才休整张飞，只摸了技能的1张牌。现在回到发动前的同一局面，试试休整黄月英自己：本回合仍只使用过1张锦囊。", "点击「重演：休整自身」。", ["action:self-rest-example"], s => { s.comparisonOrigin = { field:s.field, rest:s.rest, hand:s.hand, deck:s.deck }; s.field=[yueying(),zhangfei("ally")]; s.rest=[]; s.hand=[]; s.deck=40; }, "已回到发动前的演示局面：黄月英竖置、张飞在场，尚未摸牌。", "这是同一局面的另一种选择，点击按钮开始对比练习。"),
+      step("再次声明技能", "仍是黄月英的「横置，休整1：摸X牌」。这次选择休整发动技能的黄月英自己，张飞留在战场。", "点击黄月英，声明发动技能。", ["field:yueying"], s => { s.selected="yueying"; }, "已声明技能。接下来选择黄月英自己支付休整1。", "点击战场上的黄月英。"),
+      step("休整发动者自身", "武将发动技能时，若选择休整自己支付费用，可以额外摸1张牌。先横置黄月英，再将她移入休整区。", "再次点击黄月英，休整她自己。", ["field:yueying"], s => { s.field.find(c=>c.id==="yueying").tapped=true; rest(s,"yueying"); s.selected=""; }, "黄月英已进入休整区，张飞留场。先结算休整自身的额外摸牌，再结算技能效果。", "选择黄月英自己支付费用，本次不选择张飞。"),
+      step("先摸：休整自身的额外1张", "先处理休整自身触发的额外摸牌。选择摸1张；黄月英技能的摸X牌尚未结算。", "点击游戏牌堆，额外摸1张。", ["zone:deck"], s => { draw(s,card("self-rest-shan","闪")); }, "额外摸到1张闪，手牌0→1。接下来才结算黄月英的技能效果。", "点公共游戏牌堆，先摸休整自身的这1张。"),
+      step("再摸：黄月英的技能效果", "本回合使用过1张锦囊，X=1，现在结算技能再摸1张。休整自身的额外摸牌不占技能的摸牌数量。", "再次点击游戏牌堆，结算技能摸1张。", ["zone:deck"], s => { draw(s,card("self-rest-tao","桃")); }, "技能摸到1张桃，手牌1→2：先额外摸1，再技能摸1。黄月英仍在休整区，技能正常结算完成。", "再次点公共游戏牌堆，结算技能的1张牌。"),
+      step("回到留场示例，学习重置", "对比完成：休整自身时，先额外摸1，再结算技能摸1。下一章回到第一种选择——黄月英横置留场、张飞休整——学习下回合重置。休整区的武将不会自动回场。", "点击「回到留场示例，进入下回合」。", ["action:next-own-turn"], s => { Object.assign(s,s.comparisonOrigin); delete s.comparisonOrigin; s.phase="准备"; s.tricksUsed=0; }, "已切回休整张飞的示例，并进入下个自己的回合：黄月英等待重置，张飞仍在休整区。", "点击对话框按钮，切回第一种选择的局面，继续学习重置。")
     ] },
     { id: "turn", title: "走完一个回合", subtitle: "准备重置，再走完整流程", time: "3 分钟", icon: "回合", setup: () => ({ ...base(), phase: "准备", field: [yueying({ tapped: true })], rest: [zhangfei("ally")], hand: [card("shan", "闪")], deck:39, discard:[card("previous-trick", "无中生有")] }), recap: "黄月英因上次发动技能横置，下个自己的回合准备阶段重置；休整区里的张飞不会自动回场。通常摸2、上阵2，先手首回合各为1。", steps: [
-      step("准备：重置上次横置的黄月英", "承接上一章：黄月英发动技能后仍横置。现在是下个自己的回合准备阶段，没有禁止重置的效果，可以将她转回竖置。", "点击横置的黄月英，重置她。", ["field:yueying"], s => { s.field[0].tapped = false; s.phase = "判定"; }, "黄月英恢复竖置，可在符合时机与费用条件时再次发动技能。张飞仍在休整区。", "点横着的黄月英，不是休整区里的张飞。"),
+      step("准备：重置上次横置的黄月英", "承接上一章：黄月英发动技能后仍横置。现在是下个自己的回合准备阶段，将她转回竖置。", "点击横置的黄月英，重置她。", ["field:yueying"], s => { s.field[0].tapped = false; s.phase = "判定"; }, "黄月英恢复竖置，可在符合时机与费用条件时再次发动技能。张飞仍在休整区。", "点横着的黄月英，不是休整区里的张飞。"),
       step("判定：本次没有延时锦囊", "判定区没有牌，本次无需翻牌判定，可以进入摸牌阶段。实际有延时锦囊时须先处理。", "点击「判定区为空，继续」。", ["action:judgment"], s => { s.phase = "摸牌"; }, "判定阶段已通过，进入摸牌阶段。", "点击右侧操作区中的继续按钮。"),
       step("摸牌：补充游戏牌", "通常摸牌阶段摸 2 张游戏牌。注意：先手玩家的首回合只摸 1 张。", "点击「游戏牌堆」，摸 2 张。", ["zone:deck"], s => { draw(s, card("sha", "杀")); draw(s, card("tao", "桃")); s.phase = "出牌"; }, "已摸 2 张，手牌 1 → 3。现在进入出牌阶段。", "点击中间的公共游戏牌堆，不是右侧军营。"),
-      step("出牌：也可以选择保留资源", "出牌阶段可以用游戏牌、发动符合条件的技能，也可以主动结束。本次保留 3 张手牌。", "点击「结束出牌」。", ["action:end-play"], s => { s.phase = "上阵"; }, "出牌阶段结束，接下来进入上阵阶段。", "本章练习流程，点击右侧结束出牌按钮。"),
-      step("上阵：补充武将", "通常上阵阶段上阵 2 名武将。先手首回合上阵 1。新武将从军营进入战场，通常以暗置状态入场。", "点击「军营」，上阵 2。", ["zone:camp"], s => { deploy(s, 2); s.phase = "弃牌"; }, "军营减少 2，战场增加 2 名暗置武将。进入弃牌阶段。", "上阵来自我方军营，而非公共游戏牌堆。"),
+      step("出牌：也可以选择保留资源", "出牌阶段可以用游戏牌、发动符合条件的技能，也可以主动结束。本次保留 3 张手牌。", "点击「结束出牌」。", ["action:end-play"], s => { s.phase = "出牌阶段结束时"; }, "出牌阶段结束时，上阵补充武将，然后进入弃牌阶段。", "本章练习流程，点击右侧结束出牌按钮。"),
+      step("上阵：补充武将", "通常在出牌阶段结束时上阵 2 名武将。先手首回合上阵 1。新武将从军营进入战场，通常以暗置状态入场。", "点击「军营」，上阵 2。", ["zone:camp"], s => { deploy(s, 2); s.phase = "弃牌"; }, "军营减少 2，战场增加 2 名暗置武将。进入弃牌阶段。", "上阵来自我方军营，而非公共游戏牌堆。"),
       step("弃牌与结束", "现在有 3 名战场武将、3 张手牌、4 点体力，均未超限。没有其他效果时，进入结束阶段并结束回合。", "点击「结束回合」。", ["action:end-turn"], s => { s.phase = "结束"; }, "一个回合完成。下一章练习超出上限时如何收尾。", "无需额外弃牌，点击右侧结束回合按钮。")
     ] },
     { id: "discard", title: "学会回合收尾", subtitle: "先处理武将，再处理手牌", time: "2 分钟", icon: "取舍", setup: () => ({ ...base(), phase: "弃牌", hp: 2, field: [general("guanyu", "关羽", "TY01-062"), zhangfei("ally1"), general("ally2", "赵云", "TY01-070"), general("ally3", "马超", "TY01-100"), { ...pangtong(), id:"ally4" }, yueying({ id:"ally5" })] }), recap: "默认弃牌阶段先休整战场武将至 5 名，再弃手牌至当前体力值。体力上限不是默认手牌上限；装备和技能可以修正。", steps: [
-      step("先处理战场上限", "你有 6 名战场武将，超过默认上限 5。先自选休整 1 名，再处理手牌。本次没有离场技能插入。", "点击任意一名我方战场武将，休整至 5 名。", (s, a) => a.startsWith("field:") && s.field.some(c => `field:${c.id}` === a), (s, a) => rest(s, a.slice(6)), "战场现在为 5 名。因阶段上限休整，不是发动技能支付自身费用，不额外摸牌。", "现在点手牌不会执行弃牌。请先选一名战场武将。"),
+      step("先处理战场上限", "你有 6 名战场武将，超过默认上限 5。先自选休整 1 名，再处理手牌。", "点击任意一名我方战场武将，休整至 5 名。", (s, a) => a.startsWith("field:") && s.field.some(c => `field:${c.id}` === a), (s, a) => rest(s, a.slice(6)), "战场现在为 5 名。因阶段上限休整，不是发动技能支付自身费用，不额外摸牌。", "现在点手牌不会执行弃牌。请先选一名战场武将。"),
       step("手牌上限看当前体力", "你的体力是 2 / 5，没有装备或技能修正，因此手牌上限为 2。现在有 4 张手牌，请先弃 1 张。", "点击任意一张手牌弃置。", (s, a) => a.startsWith("hand:") && s.hand.some(c => `hand:${c.id}` === a), (s, a) => s.discard.push(use(s, a.slice(5))), "手牌 4 → 3，还需要弃 1 张。不能按体力上限 5 张保留。", "任选一张手牌；本关不限定保留哪两张。"),
       step("保留到上限即可", "你还有 3 张手牌，当前体力为 2。再弃 1 张即可，不需要把手牌全部弃光。", "再点击一张手牌弃置。", (s, a) => a.startsWith("hand:") && s.hand.some(c => `hand:${c.id}` === a), (s, a) => s.discard.push(use(s, a.slice(5))), "手牌已为 2 张，战场为 5 名，收尾完成。", "从剩余 3 张手牌中选择一张。")
     ] },
@@ -269,10 +274,10 @@ document.querySelectorAll('[data-embedded]').forEach(img=>{img.src=embeddedArt[i
     return true;
   }
   // Restore only validated actions, never a board supplied by localStorage.
-  const VERSION = 3;
+  const VERSION = 4;
   function migrate(saved) {
     if (!saved) return saved;
-    if (saved.version === 2) return { ...saved, version: VERSION, history: saved.lesson === 4 ? [] : saved.history, completed: Array.isArray(saved.completed) ? saved.completed.filter(id=>id!=="skill") : [] };
+    if (saved.version === 2 || saved.version === 3) return { ...saved, version: VERSION, history: saved.lesson === 4 ? [] : saved.history, completed: Array.isArray(saved.completed) ? saved.completed.filter(id=>id!=="skill") : [] };
     if (saved.version !== 1) return saved;
     const oldIds = ["table","opening","attack","respond","skill","turn","discard","challenge"];
     const id = oldIds[saved.lesson] || "table";
@@ -326,7 +331,7 @@ document.querySelectorAll('[data-embedded]').forEach(img=>{img.src=embeddedArt[i
     马超: "壮志凌云 · 蜀 · 猛将\n当你使用【杀】后 横置，休整1：选择对手战场上的1武将，其无法发动技能直到回合结束。若此【杀】为转化【杀】，则此【杀】不能被【闪】响应。",
     暗置武将: "武将从军营上阵后通常暗置。当前教学不展示这张武将的身份。"
   };
-  const actionLabels = { mulligan: "调度手牌", damage: "结算伤害", judgment: "判定区为空，继续", "end-play": "结束出牌", "end-turn": "结束回合", "next-own-turn":"进入下个自己的回合", "rescue-two":"休整2名，摸2张", finish: "结算伤害与救援" };
+  const actionLabels = { mulligan: "调度手牌", damage: "结算伤害", judgment: "判定区为空，继续", "end-play": "结束出牌", "end-turn": "结束回合", "self-rest-example":"重演：休整自身", "next-own-turn":"回到留场示例，进入下回合", "rescue-two":"休整2名，摸2张", finish: "结算伤害与救援" };
   function mobileText(text) { return text.replaceAll("右侧操作区", "对话框").replaceAll("右侧操作", "对话框操作").replaceAll("右侧结算", "对话框结算").replaceAll("右侧按钮", "对话框按钮").replaceAll("右侧结束", "对话框结束").replaceAll("点击手牌区的标题，不必选择某张牌。", "点击牌桌下方高亮的手牌区域。").replaceAll("点击黄月英、张飞上方的「战场」标题。", "点击牌垫上黄月英、张飞所在的高亮区域。"); }
   function save() {
     try { localStorage.setItem(KEY, JSON.stringify({ version: T.VERSION, lesson: run.lesson, history: run.history, completed })); }
@@ -391,9 +396,9 @@ document.querySelectorAll('[data-embedded]').forEach(img=>{img.src=embeddedArt[i
   // when this H5 folder is hosted under a mini-program's own URL prefix.
   function portable(url) { return url.startsWith("/assets/") ? url.slice(1) : url; }
   const cardReading = [
-    {title:"先认身份", text:"左上是蜀势力，右侧是称号「妙想神机」与姓名「黄月英」，左下是红颜／巧匠类别。相同姓名也可能有不同版本，要以这张牌的牌文为准。", boxes:[[2,2,18,16],[86,18,11,46],[6,65,9,21]]},
+    {title:"先认武将信息", text:"左上是蜀势力，右侧是称号「妙想神机」与姓名「黄月英」，左下是红颜／巧匠类别。姓名相同、称号不同的牌是不同武将，要以这张牌的牌文为准。", boxes:[[2,2,18,16],[86,18,11,46],[6,65,9,21]]},
     {title:"先看时机，再看费用", text:"「出牌阶段」说明何时能发动。横置图标与「休整1」都在冒号前，都是费用：横置黄月英，并休整1名战场武将。两项都付清，才结算冒号后的效果。", boxes:[[16,68.5,41,5]]},
-    {title:"冒号后，才是技能效果", text:"摸X张游戏牌。X是你本回合使用锦囊牌的次数，且至多为2。本关已用1张锦囊，所以稍后发动技能只摸1张；不是每次固定摸2张。", boxes:[[16,73,81,6.5]]},
+    {title:"冒号后，才是技能效果", text:"摸X张游戏牌。X是你本回合使用锦囊牌的次数，且至多为2。本关已用1张锦囊，所以稍后的技能效果摸1张；不是每次固定摸2张。", boxes:[[16,73,81,6.5]]},
     {title:"底部是界限突破", text:"「1军师」是突破条件，满足后才把X的上限从2提高到3。它不是普通技能的额外费用；横置与休整1仍要支付。第08章会亲手练习突破。", boxes:[[16,80, 67,5]]}
   ];
   let readingIndex = 0;
