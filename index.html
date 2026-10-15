@@ -192,7 +192,14 @@ document.querySelectorAll('[data-embedded]').forEach(img=>{img.src=embeddedArt[i
   }
   function use(s, id) { const i = s.hand.findIndex(c => c.id === id); if (i < 0) throw new Error("手牌不存在"); return s.hand.splice(i, 1)[0]; }
   function draw(s, c) { s.hand.push(c); s.deck--; }
-  function rest(s, id) { const i = s.field.findIndex(c => c.id === id); if (i < 0) throw new Error("武将不存在"); s.rest.push(s.field.splice(i, 1)[0]); }
+  function rest(s, id) {
+    const i = s.field.findIndex(c => c.id === id);
+    if (i < 0) throw new Error("武将不存在");
+    const c = s.field.splice(i, 1)[0], wasHidden = !!c.hidden;
+    if (wasHidden) c.hidden = false;
+    s.rest.push(c);
+    return wasHidden;
+  }
   function deploy(s, count) { for (let i = 0; i < count; i++) { s.camp--; s.field.push(general(`new-${s.camp}`, "暗置武将", "", { hidden: true })); } }
   const lessons = [
     { id: "table", title: "认识你的牌桌", subtitle: "了解承天之弈", time: "2 分钟", icon: "布局", setup: base, recap: "游戏牌拿在手里；武将从军营上阵到战场，休整后进入休整区。主帅与体力是独立区域。", steps: [
@@ -225,7 +232,7 @@ document.querySelectorAll('[data-embedded]').forEach(img=>{img.src=embeddedArt[i
       step("摸牌：补充游戏牌", "通常摸牌阶段摸 2 张游戏牌。注意：先手玩家的首回合只摸 1 张。", "点击「游戏牌堆」，摸 2 张。", ["zone:deck"], s => { draw(s, card("sha", "杀")); draw(s, card("tao", "桃")); s.phase = "出牌"; }, "已摸 2 张，手牌 2 → 4。现在进入出牌阶段。", "点击中间的公共游戏牌堆，不是右侧军营。"),
       step("出牌：也可以选择保留资源", "出牌阶段可以用游戏牌、发动符合条件的技能，也可以主动结束。本次保留 4 张手牌。", "点击「结束出牌」。", ["action:end-play"], s => { s.phase = "出牌阶段结束时"; }, "出牌阶段结束时，上阵补充武将，然后进入弃牌阶段。", "本章练习流程，点击对话框结束出牌按钮。"),
       step("上阵：补充武将", "通常在出牌阶段结束时上阵 2 名武将。先手首回合上阵 1。新武将从军营进入战场，通常以暗置状态入场。", "点击「军营」，上阵 2。", ["zone:camp"], s => { s.camp -= 2; s.field.push({ ...pangtong(), hidden: true }, { ...zhangfei("new-zhangfei"), hidden: true }); s.phase = "弃牌"; }, "军营减少2，战场由4名增加至6名。进入弃牌阶段，先处理武将上限，再处理手牌上限。", "上阵来自我方军营，而非公共游戏牌堆。"),
-      step("先处理战场上限", "你有 6 名战场武将，超过默认上限 5。先自选休整 1 名，再处理手牌。", "点击任意一名我方战场武将，休整至 5 名。", (s, a) => a.startsWith("field:") && s.field.some(c => `field:${c.id}` === a), (s, a) => rest(s, a.slice(6)), "战场现在为 5 名。因阶段上限休整，不是发动技能支付自身费用，不额外摸牌。", "现在点手牌不会执行弃牌。请先选一名战场武将。"),
+      step("先处理战场上限", "你有 6 名战场武将，超过默认上限 5。先自选休整 1 名，再处理手牌。", "点击任意一名我方战场武将，休整至 5 名。", (s, a) => a.startsWith("field:") && s.field.some(c => `field:${c.id}` === a), (s, a) => { if (rest(s, a.slice(6))) return "这名武将已翻为正面朝上进入休整区。武将进入休整区时都为正面朝上。战场现为5名；因上限休整不额外摸牌，接下来再弃置手牌。"; }, "战场现在为 5 名。因阶段上限休整，不是发动技能支付自身费用，不额外摸牌。", "现在点手牌不会执行弃牌。请先选一名战场武将。"),
       step("手牌上限看当前体力", "你的体力是 2 / 5，没有装备或技能修正，因此手牌上限为 2。现在有 4 张手牌，请先弃 1 张。", "点击任意一张手牌弃置。", (s, a) => a.startsWith("hand:") && s.hand.some(c => `hand:${c.id}` === a), (s, a) => s.discard.push(use(s, a.slice(5))), "手牌 4 → 3，还需要弃 1 张。不能按体力上限 5 张保留。", "任选一张手牌；本关不限定保留哪两张。"),
       step("保留到上限即可", "你还有 3 张手牌，当前体力为 2。再弃 1 张即可，不需要把手牌全部弃光。", "再点击一张手牌弃置。", (s, a) => a.startsWith("hand:") && s.hand.some(c => `hand:${c.id}` === a), (s, a) => s.discard.push(use(s, a.slice(5))), "手牌已为 2 张，战场为 5 名，收尾完成。", "从剩余 3 张手牌中选择一张。"),
       step("结束回合", "武将已休整至默认上限5名，手牌已弃至当前体力值2张。弃牌阶段的顺序是先休整武将，再弃置手牌；完成后进入结束阶段。", "点击「结束回合」。", ["action:end-turn"], s => { s.phase = "结束"; }, "一个回合完成：回合开始重置，出牌阶段结束时上阵，弃牌阶段先休整武将、再弃置手牌。", "战场5名、手牌2张，均符合上限，可以结束回合。")
@@ -267,9 +274,10 @@ document.querySelectorAll('[data-embedded]').forEach(img=>{img.src=embeddedArt[i
       return false;
     }
     const spec = current(run);
-    spec.effect(run.board, action);
-    run.board.logs.push(spec.success);
-    run.feedback = spec.success;
+    const result = spec.effect(run.board, action);
+    const feedback = typeof result === "string" ? result : spec.success;
+    run.board.logs.push(feedback);
+    run.feedback = feedback;
     run.history.push(action);
     run.ok = true;
     return true;
