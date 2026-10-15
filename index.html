@@ -26,6 +26,8 @@ body.is-learning{background:#203432}
 .is-learning .board{padding:6px 6px 0;margin:0 auto;border:0;border-radius:0;background:none;overflow:visible;max-width:450px;position:relative}
 .table-enemy-hand{display:flex;justify-content:center;gap:3px;height:21px;margin-bottom:-5px;position:relative;z-index:2;pointer-events:none}
 .table-enemy-hand img{height:100%;width:auto;border-radius:2px;box-shadow:0 1px 3px #0009;transform:rotate(180deg)}
+.table-enemy-hand.revealed{height:62px;margin-bottom:3px}
+.table-enemy-hand.revealed img{transform:none}
 .physical-mat{position:relative;aspect-ratio:600/350;width:100%;isolation:isolate}
 .mat-background{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;z-index:-1;pointer-events:none}
 .opponent-mat{transform:rotate(180deg)}
@@ -135,6 +137,7 @@ body{overflow-x:clip;overscroll-behavior-x:none}
       <section class="physical-mat opponent-mat" aria-label="对手战场区域">
         <img class="mat-background" data-embedded="assets/tabletop/tutorial-table-lines.svg" alt="">
         <div id="enemyField" class="mat-field enemy-field"></div>
+        <div class="mat-rest physical-pile" aria-label="对手休整区"><img id="enemyRestArt" alt="对手休整区顶牌" hidden><span id="enemyRestCount" class="physical-count">0</span></div>
         <div id="enemyCamp" class="mat-camp physical-pile"></div>
         <button id="enemyHp" data-action="target:enemy" class="mat-player target-player" aria-label="对手 · 体力"><img id="enemyCommander" class="commander-art" alt="对手主帅"><img id="enemyLife" class="life-art" alt="对手体力牌"><span id="enemyHpValue" class="physical-count"></span></button>
         <span id="enemyStatus" class="sr-only"></span>
@@ -179,6 +182,7 @@ document.querySelectorAll('[data-embedded]').forEach(img=>{img.src=embeddedArt[i
     return { phase: "出牌", hp: 4, maxHp: 5, enemyHp: 5, enemyMaxHp: 5, enemyHand: 2,
       hand: [card("sha", "杀"), card("shan", "闪"), card("tao", "桃"), card("jiu", "酒")],
       field: [yueying(), zhangfei("ally")], rest: [], camp: 18, deck: 40, discard: [],
+      enemyRest: [], enemyHandCards: [], revealEnemyHand: false,
       enemyField: [general("enemy", "暗置武将", "", { hidden: true })],
       selected: "", selectedUids: [], processing: "", processingCard: null, attacked: false, commanderDown: false, enemyCommanderDown: false,
       logs: [], won: false };
@@ -188,30 +192,23 @@ document.querySelectorAll('[data-embedded]').forEach(img=>{img.src=embeddedArt[i
   function rest(s, id) { const i = s.field.findIndex(c => c.id === id); if (i < 0) throw new Error("武将不存在"); s.rest.push(s.field.splice(i, 1)[0]); }
   function deploy(s, count) { for (let i = 0; i < count; i++) { s.camp--; s.field.push(general(`new-${s.camp}`, "暗置武将", "", { hidden: true })); } }
   const lessons = [
-    { id: "table", title: "认识你的牌桌", subtitle: "两套牌，各司其职", time: "2 分钟", icon: "布局", setup: base, recap: "游戏牌拿在手里；武将从军营上阵到战场，休整后进入休整区。主帅与体力是独立区域。", steps: [
+    { id: "table", title: "认识你的牌桌", subtitle: "了解承天之弈", time: "2 分钟", icon: "布局", setup: base, recap: "游戏牌拿在手里；武将从军营上阵到战场，休整后进入休整区。主帅与体力是独立区域。", steps: [
       step("先找到手牌", "【杀】【闪】【桃】是游戏牌。它们来自双方共享的游戏牌堆，使用时机各不相同。", "点击屏幕下方的手牌区域。", ["zone:hand"], () => {}, "找到了。游戏牌是你出牌和响应时使用的资源。", "点击牌桌下方高亮的手牌区域。"),
-      step("再找到军营", "武将牌与游戏牌分开。军营是你的武将牌堆，上阵通常从军营顶取牌。", "点击我方「军营」。", ["zone:camp"], () => {}, "军营找到了。它不会像游戏牌一样直接补入你的手牌。", "军营在我方牌桌右侧，显示剩余武将数。"),
-      step("武将在这里发挥作用", "上阵的武将进入战场。武将技能各有时机、费用和效果，稍后会亲自发动一次。", "点击我方「战场」。", ["zone:field"], () => {}, "战场是武将发动技能、支付休整费用的主要区域。", "点击黄月英、张飞上方的「战场」标题。"),
-      step("休整不是弃手牌", "休整会把战场上的武将移入休整区。游戏牌使用或弃置后则通常进入公共弃牌堆。", "点击「休整区」，区分这两个去向。", ["zone:rest"], () => {}, "很好。武将与游戏牌走的是不同的区域路线。", "点击我方牌桌右下方的休整区。")
+      step("再找到军营", "武将牌与游戏牌分开。军营是你的武将牌堆，通常由40名武将组成。", "点击我方「军营」。", ["zone:camp"], () => {}, "军营找到了。它不会像游戏牌一样直接补入你的手牌。", "军营在我方牌桌右侧，显示剩余武将数。"),
+      step("武将在这里发挥作用", "上阵的武将进入战场。武将技能各有时机、费用和效果，稍后会亲自发动一次。", "点击我方「战场」。", ["zone:field"], () => {}, "战场是武将发动技能的主要区域。", "点击牌垫上黄月英、张飞所在的高亮区域。"),
+      step("休整区与弃牌区", "休整会把战场上的武将置入休整区。游戏牌使用或弃置后则通常进入公共弃牌堆。", "点击「休整区」，区分这两个去向。", ["zone:rest"], () => {}, "很好。武将与游戏牌进入的是不同的区域。", "点击我方牌桌右下方的休整区。")
     ] },
-    { id: "opening", title: "决定起手", subtitle: "先看手牌，再做调度", time: "1 分钟", icon: "起手", setup: () => ({ ...base(), phase: "手牌调度", hand: [card("a", "杀"), card("b", "杀"), card("c", "酒"), card("d", "酒")] }), recap: "双方依次选择保留或调度。调度会将原手牌随机置于牌库底，再抽取 4 张，不是只换选中的一张。", steps: [
-      step("试一次整手调度", "这手牌偏进攻，缺少【闪】。本次练习选择调度：将全部 4 张手牌随机置于牌库底，再抽 4 张。", "点击「调度手牌」。", ["action:mulligan"], s => { s.hand = [card("sha", "杀"), card("shan", "闪"), card("tao", "桃"), card("jiu", "酒")]; }, "4 张起手牌全部换过了；牌堆数量不变，也没有牌被弃置。", "在右侧操作区选择调度，不是点击单张手牌。"),
+    { id: "opening", title: "决定起手", subtitle: "先看手牌，再做调度", time: "1 分钟", icon: "起手", setup: () => ({ ...base(), phase: "手牌调度", hand: [card("a", "杀"), card("b", "杀"), card("c", "酒"), card("d", "酒")] }), recap: "双方依次选择保留或调度。调度会将原手牌以随机顺序置于牌库底，再抽取 4 张，不是只换选中的一张。", steps: [
+      step("试一次调度手牌", "这手牌偏进攻，缺少【闪】。本次学习调度手牌：将全部 4 张手牌以随机顺序置于牌库底，再抽 4 张。", "点击「调度手牌」。", ["action:mulligan"], s => { s.hand = [card("sha", "杀"), card("shan", "闪"), card("tao", "桃"), card("jiu", "酒")]; }, "4 张起手牌全部换过了；牌堆数量不变，也没有牌被弃置。", "在对话框选择调度，不是点击单张手牌。"),
       step("认出防御牌", "新的手牌中有进攻、防御和回复。现在只是认识牌，尚未进入出牌阶段。", "点击手牌中的【闪】。", ["hand:shan"], () => {}, "【闪】一般在要求你响应时使用，不能当成自己的主动进攻牌。", "找到牌名为「闪」的手牌。")
     ] },
-    { id: "attack", title: "打出第一张杀", subtitle: "选牌 → 选目标 → 看结算", time: "2 分钟", icon: "进攻", setup: () => ({ ...base(), enemyHand: 0 }), recap: "【杀】先指定目标，再等待响应，未被闪避时造成伤害。默认每个出牌阶段只能主动使用 1 张杀，卡牌或技能可以改变限制。", steps: [
-      step("选择你的进攻牌", "当前是你的出牌阶段。对手这次没有手牌，也没有防具或伤害技能。先选【杀】，再指定目标。", "点击手牌中的【杀】。", ["hand:sha"], s => { s.selected = "sha"; }, "已选中【杀】。选牌还没有消耗它，接下来指定对手。", "点击我方手牌第一张【杀】。"),
-      step("杀的目标是玩家", "本次练习直接对对手使用【杀】。", "点击上方的「对手 · 体力」。", ["target:enemy"], s => { s.processing = use(s, "sha").name; s.selected = ""; s.attacked = true; }, "【杀】进入处理区，等待对手响应；此时还没有扣除体力。", "目标是对手玩家，点击对手的体力条。"),
-      step("看清响应后的结果", "对手没有【闪】，本次也没有其他响应。继续结算，基础伤害为 1 点。", "点击「结算伤害」。", ["action:damage"], s => { s.enemyHp--; s.discard.push(card("used-sha", "杀")); s.processing = ""; }, "对手体力 5 → 4；【杀】完成结算后进入弃牌堆，本阶段主动杀次数已用。", "处理区显示着【杀】，点击右侧结算按钮。")
-    ] },
-    { id: "respond", title: "用闪守住体力", subtitle: "对手回合，也有你的决定", time: "1 分钟", icon: "应对", setup: () => ({ ...base(), phase: "对手出牌 · 等待闪", processing: "对手的杀", enemyHand: 1 }), recap: "响应窗口出现时再使用【闪】。闪避杀不扣体力；【桃】回复体力，不能代替【闪】。", steps: [
-      step("轮到你响应", "对手使用了一张普通【杀】，正在等待你响应。你可以用【闪】避免这次伤害。", "点击手牌中的【闪】。", ["hand:shan"], s => { s.discard.push(use(s, "shan"), card("enemy-sha", "杀")); s.processing = ""; }, "你使用了【闪】。这次杀被闪避，你仍为 4 / 5 体力。", "【桃】不能闪避【杀】；请选择【闪】。"),
-      step("核对结算", "响应结束后，两张游戏牌都进入弃牌堆。你可以随时查看牌堆的变化来理解发生了什么。", "点击公共「弃牌堆」。", ["zone:discard"], () => {}, "弃牌堆中是你使用的【闪】和对手的【杀】。", "公共牌堆位于双方牌桌之间。")
-    ] },
-    { id: "skill", title: "看懂武将与发动技能", subtitle: "读牌面，再练横置与休整", time: "5 分钟", icon: "武将", setup: () => ({ ...base(), field: [yueying(), zhangfei("ally")], hand: [], tricksUsed: 1, discard: [card("previous-trick", "无中生有")] }), recap: "妙想神机·黄月英发动技能需要横置并休整 1。休整张飞时，黄月英横置留场，技能摸1；改为休整自身时，先额外摸1，再结算技能摸1。只有留在战场的横置武将，才会在下个自己的回合准备阶段重置。", steps: [
-      step("先放大，认识武将牌", "先看懂牌面，再发动技能。点击黄月英，放大查看武将信息、发动时机、费用、技能效果和界限突破。", "点击黄月英，打开卡面讲解。", ["inspect:yueying"], () => {}, "卡面读完了。回到战场，按刚才看到的时机与费用发动技能。", "点亮框中的黄月英即可放大；看完四段讲解，再开始操作。"),
-      step("找一名需要横置的武将", "妙想神机·黄月英：出牌阶段 横置，休整1：摸X牌，X为本回合使用锦囊的次数，至多为2。本局面已使用1张锦囊，所以本次摸1。", "点击黄月英，声明发动技能。", ["field:yueying"], s => { s.selected = "yueying"; }, "已声明黄月英技能，接下来一起支付横置与休整1的费用。", "点战场上的黄月英。她的牌文确实写有「横置」，发动前要看清费用。"),
-      step("横置发动者，休整另一名武将", "选择张飞支付休整1；黄月英横置后留在战场。两项费用都要支付，横置并不能代替休整。", "点击张飞，支付本次技能费用。", ["field:ally"], s => { s.field.find(c => c.id === "yueying").tapped = true; rest(s, "ally"); s.selected = ""; }, "黄月英已横置；张飞进入休整区。本次没有休整发动者自身，不额外摸牌。", "点张飞支付休整；黄月英将横置并留在战场。"),
-      step("费用支付后，摸牌", "本回合已使用1张锦囊，X=1。现在结算黄月英的摸牌效果。练习牌堆顶固定为闪。", "点击公共游戏牌堆，摸1张。", ["zone:deck"], s => { draw(s, card("shan", "闪")); }, "获得1张闪。黄月英仍横置，此时无法再次支付横置费用。", "点双方牌垫之间的游戏牌堆。"),
+
+
+    { id: "skill", title: "看懂武将与发动技能", subtitle: "读牌面，学习横置与休整", time: "5 分钟", icon: "武将", setup: () => ({ ...base(), field: [yueying(), zhangfei("ally")], hand: [], tricksUsed: 1, discard: [card("previous-trick", "无中生有")] }), recap: "妙想神机·黄月英发动技能需要横置并休整 1。休整张飞时，黄月英横置留场，技能摸1；改为休整自身时，先额外摸1，再结算技能摸1。只有留在战场的横置武将，才会在下个自己的回合准备阶段重置。", steps: [
+      step("先放大，认识武将牌", "先看懂牌面，再发动技能。点击黄月英，放大查看武将信息、发动时机、费用、技能效果和界限突破条件。", "点击黄月英，打开卡面讲解。", ["inspect:yueying"], () => {}, "卡面读完了。回到战场，按刚才看到的时机与费用发动技能。", "点亮框中的黄月英即可放大；看完四段讲解，再开始操作。"),
+      step("选择想要发动技能的武将", "妙想神机·黄月英：出牌阶段 横置，休整1：摸X牌，X为本回合使用锦囊的次数，至多为2。本局面已使用1张锦囊，所以本次摸1。", "点击黄月英，声明发动技能。", ["field:yueying"], s => { s.selected = "yueying"; }, "已声明黄月英技能，接下来一起支付横置与休整1的费用。", "点战场上的黄月英。她的牌文确实写有「横置」，发动前要看清费用。"),
+      step("横置发动者，休整另一名武将", "选择张飞支付休整1；黄月英横置后留在战场。两项费用都要支付，横置并不能代替休整。", "点击张飞，支付本次技能费用。", ["field:ally"], s => { s.field.find(c => c.id === "yueying").tapped = true; rest(s, "ally"); s.selected = ""; }, "黄月英已横置；张飞进入休整区。", "点张飞支付休整；黄月英将横置并留在战场。"),
+      step("费用支付后，摸牌", "本回合已使用1张锦囊，X=1。现在结算黄月英的摸牌效果。", "点击公共游戏牌堆，摸1张。", ["zone:deck"], s => { draw(s, card("shan", "闪")); }, "获得1张闪。黄月英仍横置，此时无法再次支付横置费用。", "点双方牌垫之间的游戏牌堆。"),
       step("换一种费用选择", "刚才休整张飞，只摸了技能的1张牌。现在回到发动前的同一局面，试试休整黄月英自己：本回合仍只使用过1张锦囊。", "点击「重演：休整自身」。", ["action:self-rest-example"], s => { s.comparisonOrigin = { field:s.field, rest:s.rest, hand:s.hand, deck:s.deck }; s.field=[yueying(),zhangfei("ally")]; s.rest=[]; s.hand=[]; s.deck=40; }, "已回到发动前的演示局面：黄月英竖置、张飞在场，尚未摸牌。", "这是同一局面的另一种选择，点击按钮开始对比练习。"),
       step("再次声明技能", "仍是黄月英的「横置，休整1：摸X牌」。这次选择休整发动技能的黄月英自己，张飞留在战场。", "点击黄月英，声明发动技能。", ["field:yueying"], s => { s.selected="yueying"; }, "已声明技能。接下来选择黄月英自己支付休整1。", "点击战场上的黄月英。"),
       step("休整发动者自身", "武将发动技能时，若选择休整自己支付费用，可以额外摸1张牌。先横置黄月英，再将她移入休整区。", "再次点击黄月英，休整她自己。", ["field:yueying"], s => { s.field.find(c=>c.id==="yueying").tapped=true; rest(s,"yueying"); s.selected=""; }, "黄月英已进入休整区，张飞留场。先结算休整自身的额外摸牌，再结算技能效果。", "选择黄月英自己支付费用，本次不选择张飞。"),
@@ -219,35 +216,37 @@ document.querySelectorAll('[data-embedded]').forEach(img=>{img.src=embeddedArt[i
       step("再摸：黄月英的技能效果", "本回合使用过1张锦囊，X=1，现在结算技能再摸1张。休整自身的额外摸牌不占技能的摸牌数量。", "再次点击游戏牌堆，结算技能摸1张。", ["zone:deck"], s => { draw(s,card("self-rest-tao","桃")); }, "技能摸到1张桃，手牌1→2：先额外摸1，再技能摸1。黄月英仍在休整区，技能正常结算完成。", "再次点公共游戏牌堆，结算技能的1张牌。"),
       step("回到留场示例，学习重置", "对比完成：休整自身时，先额外摸1，再结算技能摸1。下一章回到第一种选择——黄月英横置留场、张飞休整——学习下回合重置。休整区的武将不会自动回场。", "点击「回到留场示例，进入下回合」。", ["action:next-own-turn"], s => { Object.assign(s,s.comparisonOrigin); delete s.comparisonOrigin; s.phase="准备"; s.tricksUsed=0; }, "已切回休整张飞的示例，并进入下个自己的回合：黄月英等待重置，张飞仍在休整区。", "点击对话框按钮，切回第一种选择的局面，继续学习重置。")
     ] },
-    { id: "turn", title: "走完一个回合", subtitle: "准备重置，再走完整流程", time: "3 分钟", icon: "回合", setup: () => ({ ...base(), phase: "准备", field: [yueying({ tapped: true })], rest: [zhangfei("ally")], hand: [card("shan", "闪")], deck:39, discard:[card("previous-trick", "无中生有")] }), recap: "黄月英因上次发动技能横置，下个自己的回合准备阶段重置；休整区里的张飞不会自动回场。通常摸2、上阵2，先手首回合各为1。", steps: [
-      step("准备：重置上次横置的黄月英", "承接上一章：黄月英发动技能后仍横置。现在是下个自己的回合准备阶段，将她转回竖置。", "点击横置的黄月英，重置她。", ["field:yueying"], s => { s.field[0].tapped = false; s.phase = "判定"; }, "黄月英恢复竖置，可在符合时机与费用条件时再次发动技能。张飞仍在休整区。", "点横着的黄月英，不是休整区里的张飞。"),
-      step("判定：本次没有延时锦囊", "判定区没有牌，本次无需翻牌判定，可以进入摸牌阶段。实际有延时锦囊时须先处理。", "点击「判定区为空，继续」。", ["action:judgment"], s => { s.phase = "摸牌"; }, "判定阶段已通过，进入摸牌阶段。", "点击右侧操作区中的继续按钮。"),
-      step("摸牌：补充游戏牌", "通常摸牌阶段摸 2 张游戏牌。注意：先手玩家的首回合只摸 1 张。", "点击「游戏牌堆」，摸 2 张。", ["zone:deck"], s => { draw(s, card("sha", "杀")); draw(s, card("tao", "桃")); s.phase = "出牌"; }, "已摸 2 张，手牌 1 → 3。现在进入出牌阶段。", "点击中间的公共游戏牌堆，不是右侧军营。"),
-      step("出牌：也可以选择保留资源", "出牌阶段可以用游戏牌、发动符合条件的技能，也可以主动结束。本次保留 3 张手牌。", "点击「结束出牌」。", ["action:end-play"], s => { s.phase = "出牌阶段结束时"; }, "出牌阶段结束时，上阵补充武将，然后进入弃牌阶段。", "本章练习流程，点击右侧结束出牌按钮。"),
-      step("上阵：补充武将", "通常在出牌阶段结束时上阵 2 名武将。先手首回合上阵 1。新武将从军营进入战场，通常以暗置状态入场。", "点击「军营」，上阵 2。", ["zone:camp"], s => { deploy(s, 2); s.phase = "弃牌"; }, "军营减少 2，战场增加 2 名暗置武将。进入弃牌阶段。", "上阵来自我方军营，而非公共游戏牌堆。"),
-      step("弃牌与结束", "现在有 3 名战场武将、3 张手牌、4 点体力，均未超限。没有其他效果时，进入结束阶段并结束回合。", "点击「结束回合」。", ["action:end-turn"], s => { s.phase = "结束"; }, "一个回合完成。下一章练习超出上限时如何收尾。", "无需额外弃牌，点击右侧结束回合按钮。")
-    ] },
-    { id: "discard", title: "学会回合收尾", subtitle: "先处理武将，再处理手牌", time: "2 分钟", icon: "取舍", setup: () => ({ ...base(), phase: "弃牌", hp: 2, field: [general("guanyu", "关羽", "TY01-062"), zhangfei("ally1"), general("ally2", "赵云", "TY01-070"), general("ally3", "马超", "TY01-100"), { ...pangtong(), id:"ally4" }, yueying({ id:"ally5" })] }), recap: "默认弃牌阶段先休整战场武将至 5 名，再弃手牌至当前体力值。体力上限不是默认手牌上限；装备和技能可以修正。", steps: [
+    { id: "turn", title: "走完一个回合", subtitle: "准备重置，再走完整流程", time: "5 分钟", icon: "回合", setup: () => ({ ...base(), phase: "准备", hp: 2, field: [yueying({ tapped: true }), general("guanyu", "关羽", "TY01-062"), general("zhaoyun", "赵云", "TY01-070"), general("machao", "马超", "TY01-100")], rest: [zhangfei("ally")], hand: [card("shan", "闪"), card("jiu", "酒")], deck:39, discard:[card("previous-trick", "无中生有")] }), recap: "回合开始重置留场的横置武将，休整区的武将不会自动回场。通常摸2、上阵2，先手首回合各为1。弃牌阶段先休整武将至默认上限5名，再弃置手牌至当前体力值；装备和技能可修正上限。", steps: [
+      step("回合开始：重置上次横置的黄月英", "黄月英仍横置，张飞仍在休整区。本章补充3名蜀将，战场共4名武将；当前体力2/5、手牌2张。回合开始，先将黄月英重置。", "点击横置的黄月英，重置她。", ["field:yueying"], s => { s.field[0].tapped = false; s.phase = "判定"; }, "黄月英恢复竖置，可在符合时机与费用条件时再次发动技能。张飞仍在休整区。", "点横着的黄月英，不是休整区里的张飞。"),
+      step("判定：本次没有延时锦囊", "判定区没有牌，本次无需翻牌判定，可以进入摸牌阶段。实际有延时锦囊时须先处理。", "点击「判定区为空，继续」。", ["action:judgment"], s => { s.phase = "摸牌"; }, "判定阶段已通过，进入摸牌阶段。", "点击对话框中的继续按钮。"),
+      step("摸牌：补充游戏牌", "通常摸牌阶段摸 2 张游戏牌。注意：先手玩家的首回合只摸 1 张。", "点击「游戏牌堆」，摸 2 张。", ["zone:deck"], s => { draw(s, card("sha", "杀")); draw(s, card("tao", "桃")); s.phase = "出牌"; }, "已摸 2 张，手牌 2 → 4。现在进入出牌阶段。", "点击中间的公共游戏牌堆，不是右侧军营。"),
+      step("出牌：也可以选择保留资源", "出牌阶段可以用游戏牌、发动符合条件的技能，也可以主动结束。本次保留 4 张手牌。", "点击「结束出牌」。", ["action:end-play"], s => { s.phase = "出牌阶段结束时"; }, "出牌阶段结束时，上阵补充武将，然后进入弃牌阶段。", "本章练习流程，点击对话框结束出牌按钮。"),
+      step("上阵：补充武将", "通常在出牌阶段结束时上阵 2 名武将。先手首回合上阵 1。新武将从军营进入战场，通常以暗置状态入场。", "点击「军营」，上阵 2。", ["zone:camp"], s => { s.camp -= 2; s.field.push({ ...pangtong(), hidden: true }, { ...zhangfei("new-zhangfei"), hidden: true }); s.phase = "弃牌"; }, "军营减少2，战场由4名增加至6名。进入弃牌阶段，先处理武将上限，再处理手牌上限。", "上阵来自我方军营，而非公共游戏牌堆。"),
       step("先处理战场上限", "你有 6 名战场武将，超过默认上限 5。先自选休整 1 名，再处理手牌。", "点击任意一名我方战场武将，休整至 5 名。", (s, a) => a.startsWith("field:") && s.field.some(c => `field:${c.id}` === a), (s, a) => rest(s, a.slice(6)), "战场现在为 5 名。因阶段上限休整，不是发动技能支付自身费用，不额外摸牌。", "现在点手牌不会执行弃牌。请先选一名战场武将。"),
       step("手牌上限看当前体力", "你的体力是 2 / 5，没有装备或技能修正，因此手牌上限为 2。现在有 4 张手牌，请先弃 1 张。", "点击任意一张手牌弃置。", (s, a) => a.startsWith("hand:") && s.hand.some(c => `hand:${c.id}` === a), (s, a) => s.discard.push(use(s, a.slice(5))), "手牌 4 → 3，还需要弃 1 张。不能按体力上限 5 张保留。", "任选一张手牌；本关不限定保留哪两张。"),
-      step("保留到上限即可", "你还有 3 张手牌，当前体力为 2。再弃 1 张即可，不需要把手牌全部弃光。", "再点击一张手牌弃置。", (s, a) => a.startsWith("hand:") && s.hand.some(c => `hand:${c.id}` === a), (s, a) => s.discard.push(use(s, a.slice(5))), "手牌已为 2 张，战场为 5 名，收尾完成。", "从剩余 3 张手牌中选择一张。")
+      step("保留到上限即可", "你还有 3 张手牌，当前体力为 2。再弃 1 张即可，不需要把手牌全部弃光。", "再点击一张手牌弃置。", (s, a) => a.startsWith("hand:") && s.hand.some(c => `hand:${c.id}` === a), (s, a) => s.discard.push(use(s, a.slice(5))), "手牌已为 2 张，战场为 5 名，收尾完成。", "从剩余 3 张手牌中选择一张。"),
+      step("结束回合", "武将已休整至默认上限5名，手牌已弃至当前体力值2张。弃牌阶段的顺序是先休整武将，再弃置手牌；完成后进入结束阶段。", "点击「结束回合」。", ["action:end-turn"], s => { s.phase = "结束"; }, "一个回合完成：回合开始重置，出牌阶段结束时上阵，弃牌阶段先休整武将、再弃置手牌。", "战场5名、手牌2张，均符合上限，可以结束回合。")
     ] },
+
     { id: "breakthrough", title: "界限突破", subtitle: "把休整武将变成突破素材", time: "3 分钟", icon: "突破", setup: () => ({ ...base(), field:[yueying(), pangtong(), zhangfei("ally")], hand:[], tricksUsed:3 }), recap: "黄月英需要1军师才能界限突破。将本次休整的庞统改置于黄月英下方，素材不进入休整区，也不再作为战场武将。条件满足后，摸牌上限由2提高到3；横置和休整1的费用仍要支付。", steps: [
       step("读懂界限突破条件", "妙想神机·黄月英的突破条件为1军师，效果是摸牌的X至多为3。本局面本回合已使用3张锦囊；未突破时最多摸2。", "点击黄月英，发动她的技能。", ["field:yueying"], s => { s.selected="yueying"; }, "准备支付横置、休整1。可以利用这次休整选择合适的突破素材。", "点击黄月英。长按可以查看牌面下方的界限突破条款。"),
       step("选择满足条件的素材", "庞统的类别是军师，符合1军师；张飞是猛将，不符合这个条件。先选庞统作为本次休整的武将。", "点击庞统。", ["field:pangtong"], s => { s.selectedUids=["pangtong"]; s.selected=""; }, "已选中军师庞统。接下来决定将他作为素材置于黄月英下方。", "请选择庞统。张飞是猛将，不能填黄月英的1军师条件。"),
       step("放到武将下方，完成突破", "这次选择不把庞统放进休整区，而是置于黄月英下方。确认后，横置黄月英并支付本次休整费用。", "再次点击黄月英，将庞统置于她下方。", ["field:yueying"], s => { const material=s.field.splice(s.field.findIndex(c=>c.id==="pangtong"),1)[0]; const source=s.field.find(c=>c.id==="yueying"); source.materials.push(material); source.tapped=true; source.upgraded=true; s.selectedUids=[]; }, "庞统已垫在黄月英下方，满足1军师，界限突破生效！战场少1名武将，休整区没有增加。", "点击黄月英作为突破对象。本次休整的庞统不能放到自己下方。"),
       step("当次技能就用突破后的上限", "费用已经支付，突破也已成立。本回合使用了3张锦囊，所以这次直接摸3张；不是突破后就无条件摸3。", "点击公共游戏牌堆，摸3张。", ["zone:deck"], s => { draw(s,card("sha","杀")); draw(s,card("shan","闪")); draw(s,card("tao","桃")); }, "获得杀、闪、桃共3张。素材仍在黄月英下方，黄月英仍横置。突破没有免除她的技能费用。", "点公共游戏牌堆。条件已满足，这次的摸牌上限由2变成3。")
     ] },
-    { id: "challenge", title: "倒置主帅，绝境反杀", subtitle: "休整摸牌 → 自救 → 继续出牌", time: "3 分钟", icon: "实战", setup: () => ({ ...base(), phase: "濒死救援 · 我的出牌阶段", hp: 0, enemyHp: 1, enemyHand: 0, enemyField: [], enemyCommanderDown: true, hand: [card("shan", "闪")], field:[yueying(),zhangfei("ally")], processing:"决斗", processingCard:card("duel","决斗"), discard:[card("enemy-response","杀")] }), recap: "濒死时，尚未倒置的主帅可以倒置，选择休整0至全部战场武将并摸等量牌；只倒置不会回血。本关休整2摸到桃和杀，用桃自救，原决斗结算后继续自己的出牌阶段反杀。主帅保持倒置，不能靠下回合重置再用。", steps: [
-      step("没有桃，还有一次机会", "这是你的出牌阶段：你使用决斗，却无法继续出杀，体力降到0。手里只有闪，但主帅尚未倒置，可以倒置并休整武将摸牌自救。", "点击自己的主帅，选择倒置救援。", ["commander:self"], s => { s.rescueDeclared=true; }, "已选择主帅救援。先决定休整数量，再选择具体武将；确认后才实际倒置、休整并摸牌。", "点我方牌垫左下角的主帅牌。闪不能回血，主帅本身也不会直接回复体力。"),
+    { id: "challenge", title: "倒置主帅，绝境反杀", subtitle: "将军规则与被将状态", time: "4 分钟", icon: "实战", setup: () => ({ ...base(), phase: "濒死救援 · 我的出牌阶段", hp: 0, enemyHp: 1, enemyHand: 0, enemyField: [yueying({id:"enemy-yueying"}), zhangfei("enemy-zhangfei")], enemyCommanderDown: false, hand: [card("shan", "闪")], field:[yueying(),zhangfei("ally")], processing:"决斗", processingCard:card("duel","决斗"), discard:[card("enemy-response","杀")] }), recap: "将军规则：倒置主帅牌，休整武将并摸等量牌。主帅牌倒置的玩家视为处于被将状态。本局你摸到桃自救并反击，对手也使用将军规则、休整2名武将，却未摸到桃且无法救援，因此你获胜。如果自己的回合结束后，自己的主帅仍处于被将状态，则直接输掉游戏。", steps: [
+      step("没有桃，还有一次机会", "这是你的出牌阶段：你使用决斗，却无法继续出杀，体力降到0。手里只有闪，但主帅牌尚未倒置，可以使用将军规则：倒置主帅牌，休整武将并摸等量牌。主帅牌倒置，即视为处于被将状态。", "点击自己的主帅，选择使用将军规则。", ["commander:self"], s => { s.rescueDeclared=true; }, "已选择使用将军规则。先决定休整数量，再选择具体武将；确认后才实际倒置、休整并摸牌。", "点我方牌垫左下角的主帅牌。闪不能回血，主帅本身也不会直接回复体力。"),
       step("休整多少，就摸多少", "你有2名战场武将，可选择休整0、1或2名并摸等量牌。为了争取自救与反击，本关选择休整2。", "点击「休整2名，摸2张」。", ["action:rescue-two"], s => { s.rescueCount=2; }, "本次选择休整2名。接下来亲自选中两名战场武将。", "本关选择2名，才会摸2张；倒置主帅并不是固定摸2张。"),
-      step("选择第一名武将", "这不是发动张飞技能，而是为主帅救援选择休整对象。两名都选好后再一起确认。", "点击张飞。", ["field:ally"], s => { s.selectedUids=["ally"]; }, "已选张飞，还差1名。此时还没有离场或摸牌。", "点击战场上的张飞。选择对象还没有支付费用。"),
+      step("选择第一名武将", "这不是发动张飞技能，而是为将军规则选择休整对象。两名都选好后再一起确认。", "点击张飞。", ["field:ally"], s => { s.selectedUids=["ally"]; }, "已选张飞，还差1名。此时还没有离场或摸牌。", "点击战场上的张飞。选择对象还没有支付费用。"),
       step("选择第二名武将", "再选黄月英，凑齐本次休整的2名。她会和张飞一起离开战场，不能留在场上继续发动技能。", "点击黄月英。", ["field:yueying"], s => { s.selectedUids.push("yueying"); }, "两名武将已选好。接下来确认倒置、休整并摸2张。", "点击黄月英完成选择。不能重复选择已选中的张飞。"),
-      step("倒置、休整，摸到生机", "点击牌堆确认这次救援。主帅将倒置，两名武将进入休整区，摸2张。本次牌堆固定为桃和杀，实际对局并不保证摸到救援牌。", "点击公共游戏牌堆，确认并摸2张。", ["zone:deck"], s => { s.commanderDown=true; for(const id of s.selectedUids) rest(s,id); s.selectedUids=[]; draw(s,card("tao","桃")); draw(s,card("sha","杀")); }, "主帅已倒置，休整2、摸2完成。你仍为0体力，还没有脱离濒死；现在手里有桃了！", "点公共游戏牌堆。摸牌不等于回血，接下来还要使用桃。"),
-      step("用刚摸到的桃救自己", "先把体力回复到至少1，才能继续对局。现在使用刚摸到的桃；不能跳过救援直接用杀反击。", "点击刚摸到的桃。", ["hand:tao"], s => { s.discard.push(use(s,"tao")); s.hp=1; s.discard.push(s.processingCard); s.processing=""; s.processingCard=null; s.phase="出牌"; }, "体力0→1，脱离濒死。原决斗已结算结束，仍是你的出牌阶段，主帅保持倒置。", "先使用桃。你仍在濒死时不能主动用杀。"),
+      step("倒置、休整，摸到生机", "点击牌堆确认使用将军规则。主帅牌将倒置，两名武将进入休整区，摸2张。本次牌堆固定为桃和杀，实际对局并不保证摸到救援牌。", "点击公共游戏牌堆，确认并摸2张。", ["zone:deck"], s => { s.commanderDown=true; for(const id of s.selectedUids) rest(s,id); s.selectedUids=[]; draw(s,card("tao","桃")); draw(s,card("sha","杀")); }, "主帅牌已倒置，你处于被将状态；休整2、摸2完成。你仍为0体力，还没有脱离濒死；现在手里有桃了！", "点公共游戏牌堆。摸牌不等于回血，接下来还要使用桃。"),
+      step("用刚摸到的桃救自己", "先把体力回复到至少1，才能继续对局。现在使用刚摸到的桃；不能跳过救援直接用杀反击。", "点击刚摸到的桃。", ["hand:tao"], s => { s.discard.push(use(s,"tao")); s.hp=1; s.discard.push(s.processingCard); s.processing=""; s.processingCard=null; s.phase="出牌"; }, "体力0→1，脱离濒死。原决斗已结算结束，仍是你的出牌阶段，主帅牌仍倒置，你仍处于被将状态。", "先使用桃。你仍在濒死时不能主动用杀。"),
       step("自己找出进攻方式", "这次不主动标出答案。选一张能够向对手发起进攻的手牌。需要时仍可查看提示。", "选择进攻牌。", ["hand:sha"], s => { s.selected = "sha"; }, "你选择了【杀】，还需要指定目标。", "【闪】用于响应；进攻请选择【杀】。"),
-      step("指定目标", "对手仅剩1体力，没有手牌、武将和防具，主帅已倒置，且没有其他救援。用刚摸到的杀发起反击。", "指定你的进攻目标。", ["target:enemy"], s => { s.processingCard = use(s, "sha"); s.processing=s.processingCard.name; s.selected = ""; s.attacked = true; }, "【杀】已进入处理区，对手本次无法闪避。", "点击上方对手的主帅与体力牌区域。"),
-      step("获胜发生在救援失败后", "基础伤害为1，对手进入濒死且无法救援。你从同一出牌阶段的决斗濒死中，靠倒置主帅摸到的牌完成了反杀。", "点击「结算伤害与救援」。", ["action:finish"], s => { s.enemyHp = 0; s.processing = ""; s.discard.push(s.processingCard); s.processingCard=null; s.won = true; s.phase = "练习胜利"; }, "反杀成功！倒置主帅争取到的两张牌，一张救命，一张获胜。", "点击对话框结算按钮。对手没有可用救援，结算后你获胜。")
+      step("指定目标", "对手仅剩1体力，没有手牌和防具，但主帅牌尚未倒置，战场上有2名武将。用刚摸到的杀反击；对手濒死时也能使用将军规则。", "指定你的进攻目标。", ["target:enemy"], s => { s.processingCard = use(s, "sha"); s.processing=s.processingCard.name; s.selected = ""; s.attacked = true; }, "【杀】已进入处理区，对手本次无法闪避。", "点击上方对手的主帅与体力牌区域。"),
+      step("对手受到伤害，进入濒死", "本次杀造成1点伤害，对手将进入濒死。对手的主帅牌尚未倒置，还可以使用将军规则；此时不能直接判定获胜。", "点击「结算伤害」。", ["action:damage"], s => { s.enemyHp=0; s.phase="对手濒死 · 我的出牌阶段"; }, "对手体力1→0，进入濒死。接下来查看对手使用将军规则。", "点击对话框结算伤害，先进入濒死结算。"),
+      step("对手也使用将军规则", "对手倒置主帅牌，选择休整战场上的黄月英和张飞，摸2张牌。将军规则并不保证能摸到桃；本次将展示对手摸到的两张牌。", "点击「查看对手将军规则结算」。", ["action:enemy-general"], s => { s.enemyCommanderDown=true; s.enemyRest.push(...s.enemyField); s.enemyField=[]; s.enemyHandCards=[card("enemy-draw-sha","杀"),card("enemy-draw-shan","闪")]; s.enemyHand=2; s.revealEnemyHand=true; s.deck-=2; }, "对手已处于被将状态，休整2名武将后摸到杀和闪，没有桃或酒，且没有其他救援手段，体力仍为0。", "点击对话框，查看对手倒置主帅牌、休整2名武将并摸2张牌。"),
+      step("救援失败，获得胜利", "对手没有摸到桃，也没有其他可用救援。濒死救援失败后，对手输掉游戏，你获得胜利。", "点击「结算救援结果」。", ["action:finish"], s => { s.processing=""; s.discard.push(s.processingCard); s.processingCard=null; s.won=true; s.phase="练习胜利"; }, "反杀成功！你使用将军规则摸牌自救，并在回合结束前击败了对手。", "先确认对手救援失败，再结算胜负。"),
+      step("被将状态下的回合结束规则", "记住：如果自己的回合结束后，自己的主帅牌仍处于倒置状态，即处于被将状态，则直接输掉游戏。本局已在回合结束前获胜，不会再进行回合结束结算。", "点击「记住被将状态规则」。", ["action:general-rule"], () => {}, "将军规则能争取摸牌自救的机会，但回复体力不会解除被将状态。自己的回合结束后仍被将，就直接输掉游戏。", "主帅牌倒置代表处于被将状态；用桃回复体力不等于解除被将状态。")
     ] }
   ];
   function create(index = 0) {
@@ -278,18 +277,23 @@ document.querySelectorAll('[data-embedded]').forEach(img=>{img.src=embeddedArt[i
     return true;
   }
   // Restore only validated actions, never a board supplied by localStorage.
-  const VERSION = 4;
+  const VERSION = 5;
   function migrate(saved) {
     if (!saved) return saved;
-    if (saved.version === 2 || saved.version === 3) return { ...saved, version: VERSION, history: saved.lesson === 4 ? [] : saved.history, completed: Array.isArray(saved.completed) ? saved.completed.filter(id=>id!=="skill") : [] };
-    if (saved.version !== 1) return saved;
-    const oldIds = ["table","opening","attack","respond","skill","turn","discard","challenge"];
-    const id = oldIds[saved.lesson] || "table";
-    const revised = ["skill","turn","challenge"];
-    return { ...saved, version: VERSION, lesson: lessons.findIndex(l=>l.id===id),
-      history: revised.includes(id) ? [] : saved.history,
-      completed: Array.isArray(saved.completed) ? saved.completed.filter(x=>!revised.includes(x)) : [] };
+    if (saved.version === VERSION) return saved;
+    if (![1,2,3,4].includes(saved.version)) return { version: VERSION, lesson: 0, history: [], completed: [] };
+    const oldIds = saved.version === 1
+      ? ["table","opening","attack","respond","skill","turn","discard","challenge"]
+      : ["table","opening","attack","respond","skill","turn","discard","breakthrough","challenge"];
+    const oldId = oldIds[saved.lesson] || "table";
+    const id = oldId === "discard" ? "turn" : oldId;
+    const revised = ["turn","discard","challenge"];
+    const keepHistory = !revised.includes(oldId) && !(saved.version < 4 && oldId === "skill");
+    return { ...saved, version: VERSION, lesson: Math.max(0, lessons.findIndex(l=>l.id===id)),
+      history: keepHistory ? saved.history : [],
+      completed: Array.isArray(saved.completed) ? saved.completed.filter(x=>lessons.some(l=>l.id===x) && !revised.includes(x) && !(saved.version<4 && x==="skill")) : [] };
   }
+
   function restore(saved) {
     saved = migrate(saved);
     const run = create(saved?.lesson);
@@ -335,7 +339,7 @@ document.querySelectorAll('[data-embedded]').forEach(img=>{img.src=embeddedArt[i
     马超: "壮志凌云 · 蜀 · 猛将\n当你使用【杀】后 横置，休整1：选择对手战场上的1武将，其无法发动技能直到回合结束。若此【杀】为转化【杀】，则此【杀】不能被【闪】响应。",
     暗置武将: "武将从军营上阵后通常暗置。当前教学不展示这张武将的身份。"
   };
-  const actionLabels = { mulligan: "调度手牌", damage: "结算伤害", judgment: "判定区为空，继续", "end-play": "结束出牌", "end-turn": "结束回合", "self-rest-example":"重演：休整自身", "next-own-turn":"回到留场示例，进入下回合", "rescue-two":"休整2名，摸2张", finish: "结算伤害与救援" };
+  const actionLabels = { mulligan: "调度手牌", damage: "结算伤害", judgment: "判定区为空，继续", "end-play": "结束出牌", "end-turn": "结束回合", "self-rest-example":"重演：休整自身", "next-own-turn":"回到留场示例，进入下回合", "rescue-two":"休整2名，摸2张", finish: "结算救援结果", "enemy-general":"查看对手将军规则结算", "general-rule":"记住被将状态规则" };
   function mobileText(text) { return text.replaceAll("右侧操作区", "对话框").replaceAll("右侧操作", "对话框操作").replaceAll("右侧结算", "对话框结算").replaceAll("右侧按钮", "对话框按钮").replaceAll("右侧结束", "对话框结束").replaceAll("点击手牌区的标题，不必选择某张牌。", "点击牌桌下方高亮的手牌区域。").replaceAll("点击黄月英、张飞上方的「战场」标题。", "点击牌垫上黄月英、张飞所在的高亮区域。"); }
   function save() {
     try { localStorage.setItem(KEY, JSON.stringify({ version: T.VERSION, lesson: run.lesson, history: run.history, completed })); }
@@ -402,8 +406,8 @@ document.querySelectorAll('[data-embedded]').forEach(img=>{img.src=embeddedArt[i
   const cardReading = [
     {title:"先认武将信息", text:"左上是蜀势力，右侧是称号「妙想神机」与姓名「黄月英」，左下是红颜／巧匠类别。姓名相同、称号不同的牌是不同武将，要以这张牌的牌文为准。", boxes:[[2,2,18,16],[86,18,11,46],[6,65,9,21]]},
     {title:"先看时机，再看费用", text:"「出牌阶段」说明何时能发动。横置图标与「休整1」都在冒号前，都是费用：横置黄月英，并休整1名战场武将。两项都付清，才结算冒号后的效果。", boxes:[[16,68.5,41,5]]},
-    {title:"冒号后，才是技能效果", text:"摸X张游戏牌。X是你本回合使用锦囊牌的次数，且至多为2。本关已用1张锦囊，所以稍后的技能效果摸1张；不是每次固定摸2张。", boxes:[[16,73,81,6.5]]},
-    {title:"底部是界限突破", text:"「1军师」是突破条件，满足后才把X的上限从2提高到3。它不是普通技能的额外费用；横置与休整1仍要支付。第08章会亲手练习突破。", boxes:[[16,80, 67,5]]}
+    {title:"冒号后，才是技能效果", text:"摸X张游戏牌。X是你本回合使用锦囊牌的次数，且至多为2。本关已用1张锦囊，所以稍后的技能效果为摸1张。", boxes:[[16,73,81,6.5]]},
+    {title:"底部是界限突破", text:"「1军师」是突破条件，满足后才把X的上限从2提高到3。它不是普通技能的额外费用；横置与休整1仍要支付。第05章会亲手学习界限突破。", boxes:[[16,80, 67,5]]}
   ];
   let readingIndex = 0;
   function renderCardReading() {
@@ -479,11 +483,15 @@ document.querySelectorAll('[data-embedded]').forEach(img=>{img.src=embeddedArt[i
       $(owner + "HpValue").textContent = `${value}/${maximum}`;
       $(owner + "Hp").setAttribute("aria-label", `${owner === "self" ? "我方" : "对手"} · 体力 ${value}/${maximum}`);
     }
-    $("enemyStatus").textContent = `手牌 ${s.enemyHand} 张${s.enemyCommanderDown ? " · 主帅已倒置" : ""}`;
-    $("selfStatus").textContent = s.attacked ? "本出牌阶段已使用杀" : "跟随指引，亲手操作";
+    $("enemyStatus").textContent = `手牌 ${s.enemyHand} 张${s.enemyCommanderDown ? " · 被将状态" : ""}`;
+    $("selfStatus").textContent = `${s.commanderDown ? "被将状态 · " : ""}${s.attacked ? "本出牌阶段已使用杀" : "跟随指引，亲手操作"}`;
     $("enemyField").replaceChildren();
-    for (const c of s.enemyField) { const img = document.createElement("img"); img.src = portable(imageUrl(c)); img.alt = "对手暗置武将"; $("enemyField").append(img); }
-    $("enemyHand").replaceChildren(...Array.from({length:s.enemyHand}, () => { const img = document.createElement("img"); img.src = gameBack; img.alt = "对手手牌牌背"; return img; }));
+    for (const c of s.enemyField) { const img = document.createElement("img"); img.src = portable(imageUrl(c)); img.alt = `对手武将：${c.name}`; $("enemyField").append(img); }
+    $("enemyHand").replaceChildren(...Array.from({length:s.enemyHand}, (_, i) => { const img = document.createElement("img"); const c=s.revealEnemyHand && s.enemyHandCards[i]; img.src = c ? portable(imageUrl(c)) : gameBack; img.alt = c ? `对手摸到的${c.name}` : "对手手牌牌背"; return img; }));
+    $("enemyHand").classList.toggle("revealed", s.revealEnemyHand);
+    $("enemyRestArt").hidden = !s.enemyRest.length;
+    if(s.enemyRest.length) $("enemyRestArt").src=portable(imageUrl(s.enemyRest.at(-1)));
+    $("enemyRestCount").textContent=s.enemyRest.length;
     $("enemyCamp").replaceChildren(); const enemyBack = document.createElement("img"); enemyBack.src = back; enemyBack.alt = "对手军营"; $("enemyCamp").append(enemyBack);
     $("campArt").src = back; $("deckArt").src = gameBack;
     for (const [id, c] of [["restArt", s.rest.at(-1)], ["discardArt", s.discard.at(-1)], ["processArt", s.processingCard || (s.processing ? {name:"杀"} : null)]]) {
